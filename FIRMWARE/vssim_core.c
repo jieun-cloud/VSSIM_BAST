@@ -599,7 +599,9 @@ void INSERT_RW_TO_PER_CORE_EVENT_QUEUE(event_queue_entry* eq_entry, int w_buf_in
 		per_core_length[i] = 0;
 		per_core_io_flag[i] = false;
 	}
-	
+	//For debugging
+	//printf("Event queue entry sector nb:%d, length: %d\n", sector_nb, remains);
+
 	while(remains > 0){
 		
 		if(remains > SECTORS_PER_PAGE - left_skip){
@@ -665,6 +667,12 @@ void INSERT_RW_TO_PER_CORE_EVENT_QUEUE(event_queue_entry* eq_entry, int w_buf_in
 
 		}
 	}
+
+	//For debugging
+
+//	for(i=0; i<N_IO_CORES; i++){
+//		printf("Core:%d Per core sector nb : %d Per core length : %d\n", i, per_core_sector_nb[i], per_core_length[i]);
+//	}
 }
 
 

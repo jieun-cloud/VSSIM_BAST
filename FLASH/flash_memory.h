@@ -17,7 +17,7 @@
 #define CMD_BLOCK_ERASE			0x60
 
 /* The number of ppn list per flash */
-#define N_PPNS_PER_PLANE	512
+#define N_PPNS_PER_PLANE	327680
 
 enum reg_state
 {

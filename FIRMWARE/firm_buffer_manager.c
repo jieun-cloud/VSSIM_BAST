@@ -958,6 +958,7 @@ void FLUSH_WRITE_BUFFER(int core_id, int w_buf_index)
 #endif
 		/* Write data to Flash memory */
 		cr_entry->n_pages = FTL_WRITE(core_id, cr_entry->sector_nb, cr_entry->length);
+		
 
 		/* Get next cr_entry */
 #ifdef IO_CORE_DEBUG

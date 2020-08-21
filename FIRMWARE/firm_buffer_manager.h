@@ -9,7 +9,7 @@
 #define _FIRM_BUFFER_MANAGER_H_
 
 #define FLUSH_TIMEOUT_USEC	300000		// 300 msec
-
+#include <pthread.h>
 extern pthread_cond_t eq_ready;
 extern pthread_mutex_t eq_lock;
 extern pthread_mutex_t cq_lock;

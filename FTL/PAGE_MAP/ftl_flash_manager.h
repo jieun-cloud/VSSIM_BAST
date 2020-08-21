@@ -12,6 +12,7 @@
 
 extern int64_t* n_total_empty_blocks;
 extern int64_t* n_total_victim_blocks;
+extern int64_t* n_total_data_blocks;
 
 typedef struct block_state_entry
 {
@@ -53,12 +54,14 @@ enum plane_state{
 typedef struct plane_info
 {
 	int64_t* inverse_mapping_table;
+	int64_t* inverse_data_block_mapping_table; //Jieun add
 	void* block_state_table;
 	enum plane_state p_state;
 	pthread_mutex_t state_lock;	
 	pthread_mutex_t gc_lock;
 	block_list empty_list;
 	block_list victim_list;
+	block_list data_block_list; //jieun add
 	struct flash_info* flash_i;
 }plane_info;
 
@@ -81,6 +84,19 @@ int INIT_PLANE_INFO(int init_info);
 int INIT_INVERSE_MAPPING_TABLE(int init_info);
 int INIT_BLOCK_STATE_TABLE(int init_info);
 int INIT_EMPTY_BLOCK_LIST(int init_info);
+
+
+
+int UPDATE_INVERSE_DATA_BLOCK_MAPPING(pbn_t pbn,  int64_t lbn); //Jieun add
+int INIT_INVERSE_DATA_BLOCK_MAPPING_TABLE(int init_info); //Jieun add
+int CHECK_INVERSE_DATA_BLOCK_MAPPING(pbn_t pbn); //Jieun add for debug
+
+
+int INIT_DATA_BLOCK_LIST(int init_info); //Jieun add
+int INSERT_DATA_BLOCK(int core_id, block_entry* new_data_block); //Jieun add
+block_entry* SEARCH_DATA_BLOCK(int core_id, pbn_t pbn); //Jieun add
+int POP_DATA_BLOCK(int core_id, block_entry* data_block); //Jieun add
+
 int INIT_VICTIM_BLOCK_LIST(int init_info);
 int INIT_VALID_ARRAY(int init_info);
 
@@ -103,6 +119,7 @@ int POP_VICTIM_BLOCK(int core_id, block_entry* victim_block);
 int64_t GET_INVERSE_MAPPING_INFO(ppn_t ppn);
 int UPDATE_INVERSE_MAPPING(ppn_t ppn, int64_t lpn);
 
+int UPDATE_INVERSE_DATA_MAPPING(pbn_t pbn, int64_t lbn); //Jieun add
 /* Get and Update the block state */
 block_state_entry* GET_BLOCK_STATE_ENTRY(pbn_t pbn);
 int UPDATE_BLOCK_STATE(int core_id, pbn_t pbn, int type);

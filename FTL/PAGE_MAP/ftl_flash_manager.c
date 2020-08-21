@@ -11,6 +11,7 @@ flash_info* flash_i;
 
 int64_t* n_total_empty_blocks;
 int64_t* n_total_victim_blocks;
+int64_t* n_total_data_blocks;
 
 int INIT_FLASH_INFO(int init_info)
 {
@@ -61,6 +62,7 @@ int INIT_PLANE_INFO(int init_info)
 		/* Set variables to NULL */
 		for(j=0; j<N_PLANES_PER_FLASH; j++){
 			cur_plane[j].inverse_mapping_table 	= NULL;
+			cur_plane[j].inverse_data_block_mapping_table 	= NULL; //Jieun add
 			cur_plane[j].block_state_table		= NULL;
 			cur_plane[j].p_state			= IDLE;
 			pthread_mutex_init(&cur_plane[j].state_lock, NULL);
@@ -73,7 +75,13 @@ int INIT_PLANE_INFO(int init_info)
 			cur_plane[j].victim_list.head		= NULL;
 			cur_plane[j].victim_list.tail		= NULL;
 			cur_plane[j].victim_list.n_blocks 	= 0;
-
+			
+			//Jieun add
+			cur_plane[j].data_block_list.head		= NULL;
+			cur_plane[j].data_block_list.tail		= NULL;
+			cur_plane[j].data_block_list.n_blocks 	= 0;
+			
+			
 			/* Init parent pointer */
 			cur_plane[j].flash_i = &flash_i[i];
 		}
@@ -85,12 +93,20 @@ int INIT_PLANE_INFO(int init_info)
 	ret = INIT_INVERSE_MAPPING_TABLE(init_info);
 	if(ret == -1) goto fail;
 
+	//Jieun add
+	ret = INIT_INVERSE_DATA_BLOCK_MAPPING_TABLE(init_info);
+	if(ret == -1) goto fail;
+
 	ret = INIT_BLOCK_STATE_TABLE(init_info);
 	if(ret == -1) goto fail;
 
 	ret = INIT_EMPTY_BLOCK_LIST(init_info);
 	if(ret == -1) goto fail;
 
+	//Jieun add
+	ret = INIT_DATA_BLOCK_LIST(init_info);
+	// For debug
+	printf("INIT per plane data block list success !!");
 	ret = INIT_VICTIM_BLOCK_LIST(init_info);
 	if(ret == -1) goto fail;
 
@@ -150,6 +166,36 @@ int INIT_INVERSE_MAPPING_TABLE(int init_info)
 				for(k=0; k<N_PAGES_PER_PLANE; k++){
 					flash_i[i].plane_i[j].inverse_mapping_table[k] = -1;
 				}
+			}
+		}
+		return 0;
+	}
+}
+
+//Jieun
+int INIT_INVERSE_DATA_BLOCK_MAPPING_TABLE(int init_info)
+{
+	int i, j, k;
+	int ret;
+
+	for(i=0; i<N_FLASH; i++){
+		for(j=0; j<N_PLANES_PER_FLASH; j++){
+			//Allocate memory for inverse data block mapping table
+			flash_i[i].plane_i[j].inverse_data_block_mapping_table = 
+					(void*)calloc(N_BLOCKS_PER_PLANE, sizeof(int64_t));
+
+			if(flash_i[i].plane_i[j].inverse_data_block_mapping_table == NULL){
+				printf("ERROR[%s] Allocate mapping table fail!\n", __FUNCTION__);
+				return -1;
+			}
+		}
+	}
+	
+	/* First boot */
+	for(i=0; i<N_FLASH; i++){
+		for(j=0; j<N_PLANES_PER_FLASH; j++){
+			for(k=0; k<N_BLOCKS_PER_PLANE; k++){
+				flash_i[i].plane_i[j].inverse_data_block_mapping_table[k] = -1;
 			}
 		}
 		return 0;
@@ -303,7 +349,7 @@ int INIT_EMPTY_BLOCK_LIST(int init_info)
 	block_list* cur_empty_list = NULL;
 	block_entry* cur_empty_entry = NULL;
 
-	/* Allocate and Intialize the total number of empty blocks of each core */
+	// Allocate and Intialize the total number of empty blocks of each core 
 	n_total_empty_blocks = (int64_t*)calloc(N_IO_CORES, sizeof(int64_t));
 	for(i=0; i<N_IO_CORES; i++){
 		n_total_empty_blocks[i] = 0;
@@ -315,7 +361,7 @@ int INIT_EMPTY_BLOCK_LIST(int init_info)
 			for(i=0; i<N_FLASH; i++){
 				for(j=0; j<N_PLANES_PER_FLASH; j++){
 
-					/* Restore empty list of the plane from the file */
+					//Restore empty list of the plane from the file 
 					cur_empty_list = &flash_i[i].plane_i[j].empty_list;
 					ret = fread(cur_empty_list, sizeof(block_list), 1, fp);
 					if(ret == -1){
@@ -323,7 +369,7 @@ int INIT_EMPTY_BLOCK_LIST(int init_info)
 						return -1;
 					}
 
-					/* Update the total number of empty blocks of the flash */
+					//Update the total number of empty blocks of the flash 
 					flash_i[i].n_empty_blocks += cur_empty_list->n_blocks;
 				}
 			}
@@ -331,10 +377,10 @@ int INIT_EMPTY_BLOCK_LIST(int init_info)
 			for(i=0; i<N_FLASH; i++){
 				for(j=0; j<N_PLANES_PER_FLASH; j++){
 
-					/* Get current empty block list */
+					//Get current empty block list
 					cur_empty_list = &flash_i[i].plane_i[j].empty_list;
 
-					/* Restore empty block list from file */
+					//Restore empty block list from file 
 					remains = cur_empty_list->n_blocks;
 
 					while(remains > 0){
@@ -378,16 +424,16 @@ int INIT_EMPTY_BLOCK_LIST(int init_info)
 
 	}
 	else{
-		/* First boot */
+		//First boot 
 		for(i=0; i<N_FLASH; i++){
 			for(j=0; j<N_PLANES_PER_FLASH; j++){
 
-				/* Get current empty block list */
+				//Get current empty block list 
 				cur_empty_list = &flash_i[i].plane_i[j].empty_list;
 
 				for(k=0; k<N_BLOCKS_PER_PLANE; k++){
 
-					/* Make new empty block entry */
+					//Make new empty block entry 
 					cur_empty_entry = (block_entry*)calloc(1,
 								sizeof(block_entry));
 
@@ -414,12 +460,44 @@ int INIT_EMPTY_BLOCK_LIST(int init_info)
 					}
 				}
 
-				/* Initialize the number of empty blocks in the plane */
+				//Initialize the number of empty blocks in the plane 
 				cur_empty_list->n_blocks = (uint32_t)N_BLOCKS_PER_PLANE;
 			}
-			/* Initialize the number of empty blocks in the flash */
+			//Initialize the number of empty blocks in the flash 
 			flash_i[i].n_empty_blocks = (uint32_t)N_BLOCKS_PER_FLASH;
 		}
+		return 0;
+	}
+}
+
+//Jieun add
+int INIT_DATA_BLOCK_LIST(int init_info)
+{
+	int i, j;
+	unsigned int remains = 0;
+	int ret;
+
+	block_list* cur_data_block_list = NULL;
+	block_entry* cur_data_block_entry = NULL;
+
+	n_total_data_blocks = (int64_t*)calloc(N_IO_CORES, sizeof(int64_t));
+	for(i=0; i<N_IO_CORES; i++){
+		n_total_data_blocks[i] = 0;
+	}
+
+	/* First boot */
+	for(i=0; i<N_FLASH; i++){
+		for(j=0; j<N_PLANES_PER_FLASH; j++){
+
+			/* Get current victim block list */
+			cur_data_block_list = &flash_i[i].plane_i[j].data_block_list;
+
+			/* Initialize the victim block list */
+			cur_data_block_list->head = NULL;
+			cur_data_block_list->tail = NULL;
+			cur_data_block_list->n_blocks = 0;
+		}
+
 		return 0;
 	}
 }
@@ -774,7 +852,7 @@ block_entry* GET_EMPTY_BLOCK(int core_id, pbn_t index, int mode)
 			cur_plane = &cur_flash->plane_i[cur_flash->plane_index];
 			cur_empty_list = &cur_plane->empty_list;
 
-			/* Check wheter the flash or plane is available */
+			
 			if(gc_mode == FLASH_GC){
 				ret = IS_AVAILABLE_FLASH(cur_flash);
 				if(ret == FAIL){
@@ -921,7 +999,167 @@ int INSERT_EMPTY_BLOCK(int core_id, block_entry* new_empty_block)
 	empty_list->n_blocks++;
 	cur_flash->n_empty_blocks++;
 	n_total_empty_blocks[core_id]++;
+	
+//	printf("Inserted empty block: flash:%d plane:%d block:%d\n",empty_list->tail->pbn.path.flash, empty_list->tail->pbn.path.plane, empty_list->tail->pbn.path.block);
+//	printf("Total empty blocks:%d\n", n_total_empty_blocks[core_id]);
+	return SUCCESS;
+}
 
+
+//Jieun add
+int INSERT_DATA_BLOCK(int core_id, block_entry* new_data_block)
+{
+	int8_t flash_nb;
+	int8_t plane_nb;
+
+	flash_info* cur_flash;
+	plane_info* cur_plane;
+	block_list* data_block_list;
+
+	/* Get address */
+	flash_nb = new_data_block->pbn.path.flash;
+	plane_nb = new_data_block->pbn.path.plane;
+
+	/* Get flash & plane structure */
+	cur_flash = &flash_i[flash_nb];
+	cur_plane = &cur_flash->plane_i[plane_nb];
+	data_block_list = &cur_plane->data_block_list;
+
+	new_data_block->prev = NULL;
+	new_data_block->next = NULL;
+
+	/* Update data block list */
+	if(data_block_list->n_blocks == 0){
+		data_block_list->head = new_data_block;
+		data_block_list->tail = new_data_block;
+	}
+	else{
+		data_block_list->tail->next = new_data_block;
+		new_data_block->prev = data_block_list->tail;
+		data_block_list->tail = new_data_block;
+	}
+
+	/* Update the total number of victim blocks */
+	data_block_list->n_blocks++;
+	n_total_data_blocks[core_id]++;
+	
+	return SUCCESS;
+}
+
+//Jieun
+block_entry* SEARCH_DATA_BLOCK(int core_id, pbn_t pbn)
+{
+	int8_t flash_nb;
+	int8_t plane_nb;
+
+	flash_info* cur_flash;
+	plane_info* cur_plane;
+	block_list* data_block_list;
+
+	/* Get address */
+	flash_nb = pbn.path.flash;
+	plane_nb = pbn.path.plane;
+	
+	/* Get flash & plane structure */
+	cur_flash = &flash_i[flash_nb];
+	cur_plane = &cur_flash->plane_i[plane_nb];
+	data_block_list = &cur_plane->data_block_list;
+
+	if(data_block_list->head == NULL){
+		printf("No data block entry\n");
+		return -1;
+	}
+
+	block_entry* temp_entry;
+	temp_entry = data_block_list->head;
+	
+	int i;
+	for(i=0;i<n_total_data_blocks[core_id];i++){
+		if(temp_entry->pbn.path.flash == pbn.path.flash && temp_entry->pbn.path.plane == pbn.path.plane && temp_entry->pbn.path.block == pbn.path.block){
+			return temp_entry;
+		}
+		temp_entry = temp_entry->next;
+	}
+	
+		printf("No matching data block!\n");
+		return -1;
+	
+}
+
+//Jieun
+int POP_DATA_BLOCK(int core_id, block_entry* data_block)
+{
+	int8_t flash_nb;
+	int8_t plane_nb;
+
+	flash_info* cur_flash;
+	plane_info* cur_plane;
+	block_list* data_block_list;
+
+	/* Get address */
+	flash_nb = data_block->pbn.path.flash;
+	plane_nb = data_block->pbn.path.plane;
+	
+	/* Get flash & plane structure */
+	cur_flash = &flash_i[flash_nb];
+	cur_plane = &cur_flash->plane_i[plane_nb];
+	data_block_list = &cur_plane->data_block_list;
+
+	/* Pop the empty block from the empty list */
+	if(data_block_list->n_blocks == 1){
+		data_block_list->head = NULL;
+		data_block_list->tail = NULL;
+	}
+	else if(data_block == data_block_list->head){
+		data_block_list->head = data_block->next;
+		data_block_list->head->prev = NULL;
+	}
+	else if(data_block == data_block_list->tail){
+		data_block_list->tail = data_block->prev;
+		data_block_list->tail->next = NULL;
+	}
+	else{
+		data_block->prev->next = data_block->next;
+		data_block->next->prev = data_block->prev;
+	}
+
+	/* Reset the next and prev pointer */
+	data_block->prev = NULL;
+	data_block->next = NULL;
+
+	/* Update the total number of empty blocks */
+	data_block_list->n_blocks--;
+//	cur_flash->n_data_blocks--;
+	n_total_data_blocks[core_id]--;
+
+	return SUCCESS;
+}
+
+
+//Jieun add
+int CHECK_DATA_BLOCK(int core_id, block_entry* data_block)
+{
+	int8_t flash_nb;
+	int8_t plane_nb;
+
+	flash_info* cur_flash;
+	plane_info* cur_plane;
+	block_list* data_block_list;
+
+	/* Get address */
+	flash_nb = data_block->pbn.path.flash;
+	plane_nb = data_block->pbn.path.plane;
+
+	/* Get flash & plane structure */
+	cur_flash = &flash_i[flash_nb];
+	cur_plane = &cur_flash->plane_i[plane_nb];
+	data_block_list = &cur_plane->data_block_list;
+
+	block_entry* check;
+	check = data_block_list -> head;
+
+	//For debug
+//	printf("data block num:%d, flash:%d plane:%d\n", n_total_data_blocks[core_id], check->pbn.path.flash, check->pbn.path.plane);
 	return SUCCESS;
 }
 
@@ -1082,6 +1320,42 @@ int64_t GET_INVERSE_MAPPING_INFO(ppn_t ppn)
 	return flash_i[flash_nb].plane_i[plane_nb].inverse_mapping_table[index];
 }
 
+//Jieun add
+int UPDATE_INVERSE_DATA_BLOCK_MAPPING(pbn_t pbn,  int64_t lbn)
+{
+	int64_t flash_nb = (int64_t)pbn.path.flash;
+	int64_t plane_nb = (int64_t)pbn.path.plane;
+	int64_t index = (int64_t)(pbn.path.block);
+
+	if(index < 0 || index > N_BLOCKS_PER_PLANE){
+		printf("ERROR[%s] wrong index: block %d\n",
+				__FUNCTION__, pbn.path.block);
+	}
+
+	flash_i[flash_nb].plane_i[plane_nb].inverse_data_block_mapping_table[index] = lbn;
+
+	return SUCCESS;
+}
+
+//Jieun add, For debugging
+int CHECK_INVERSE_DATA_BLOCK_MAPPING(pbn_t pbn)
+{
+	int64_t flash_nb = (int64_t)pbn.path.flash;
+	int64_t plane_nb = (int64_t)pbn.path.plane;
+	int64_t index = (int64_t)(pbn.path.block);
+
+	if(index < 0 || index > N_BLOCKS_PER_PLANE){
+		printf("ERROR[%s] wrong index: block %d\n",
+				__FUNCTION__, pbn.path.block);
+	}
+
+	int64_t lbn = flash_i[flash_nb].plane_i[plane_nb].inverse_data_block_mapping_table[index];
+
+	//For debugging
+	printf("Inverse data block mapping table: (flash:%d, plane:%d, block:%d) lbn:%d\n", flash_nb, plane_nb, index, lbn);
+
+	return SUCCESS;
+}
 int UPDATE_INVERSE_MAPPING(ppn_t ppn,  int64_t lpn)
 {
 	int64_t flash_nb = (int64_t)ppn.path.flash;
@@ -1100,23 +1374,23 @@ int UPDATE_INVERSE_MAPPING(ppn_t ppn,  int64_t lpn)
 
 int UPDATE_BLOCK_STATE(int core_id, pbn_t pbn, int type)
 {
-        int i;
-        block_state_entry* bs_entry = GET_BLOCK_STATE_ENTRY(pbn);
+	int i;
+	block_state_entry* bs_entry = GET_BLOCK_STATE_ENTRY(pbn);
 
 	bs_entry->type = type;
-	
-        if(type == EMPTY_BLOCK){
+
+	if(type == EMPTY_BLOCK){
 
 		/* Fill zeros to the valid array */
-                for(i=0; i<N_PAGES_PER_BLOCK; i++){
-                        UPDATE_BLOCK_STATE_ENTRY(core_id, pbn, i, INVALID);
-                }
+		for(i=0; i<N_PAGES_PER_BLOCK; i++){
+			UPDATE_BLOCK_STATE_ENTRY(core_id, pbn, i, INVALID);
+		}
 
 		/* Initialize the number of valid pages */
 		bs_entry->n_valid_pages = 0;
-        }
+	}
 
-        return SUCCESS;
+	return SUCCESS;
 }
 
 int UPDATE_BLOCK_STATE_ENTRY(int core_id, pbn_t pbn, int32_t offset, int valid)
@@ -1134,11 +1408,12 @@ int UPDATE_BLOCK_STATE_ENTRY(int core_id, pbn_t pbn, int32_t offset, int valid)
 	}
 
 	block_state_entry* bs_entry = GET_BLOCK_STATE_ENTRY(pbn);
-
+	
+	
 	if(bs_entry->core_id != core_id){
 		pthread_mutex_lock(&bs_entry->lock);
 	}
-
+	
 	bitmap_t valid_array = bs_entry->valid_array;
 
 	if(valid == VALID){
@@ -1153,10 +1428,11 @@ int UPDATE_BLOCK_STATE_ENTRY(int core_id, pbn_t pbn, int32_t offset, int valid)
 		printf("ERROR[%s] Wrong valid value\n", __FUNCTION__);
 	}
 
+	
 	if(bs_entry->core_id != core_id){
 		pthread_mutex_unlock(&bs_entry->lock);
 	}
-
+	
 	return SUCCESS;
 }
 
